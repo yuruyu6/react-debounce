@@ -1,22 +1,22 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import useDebounce from "./hooks/useDebounce";
-
-import ImageCard from "./ImageCard";
-import ImageCardSkeleton from "./ImageCardSkeleton";
+import ImageCard from "./components/ImageCard";
+import ImageCardSkeleton from "./components/ImageCardSkeleton";
 
 function App() {
   const [images, setImages] = useState({ imagesArray: [] });
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
+
+  const wrapperRef = useRef(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     fetch(
-      `https://pixabay.com/api/?key=${process.env.REACT_APP_PIXABAY_API_KEY}&per_page=24&q=${debouncedSearchTerm}`
+      `https://pixabay.com/api/?key=${process.env.REACT_APP_PIXABAY_API_KEY}&per_page=24&q=${debouncedSearchTerm}&safesearch=true`
     )
       .then((response) => response.json())
       .then((data) => {
@@ -27,8 +27,6 @@ function App() {
       .catch((error) => console.log(error));
   }, [debouncedSearchTerm]);
 
-  const wrapperRef = useRef(null);
-
   useEffect(() => {
     window.onscroll = () => {
       if (wrapperRef)
@@ -38,22 +36,24 @@ function App() {
     };
   }, [wrapperRef]);
 
+  const fetchImages = useCallback(() => {
+    fetch(
+      `https://pixabay.com/api/?key=${process.env.REACT_APP_PIXABAY_API_KEY}&page=${
+        currentPage + 1
+      }&per_page=24&q=${debouncedSearchTerm}`
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        setImages({ imagesArray: [...images.imagesArray, ...data.hits] });
+        setCurrentPage((value) => value + 1);
+      })
+      .catch((error) => console.log(error));
+  }, [currentPage, debouncedSearchTerm, images]);
+
   useEffect(() => {
-    if (isScrolledToBottom) {
-      fetch(
-        `https://pixabay.com/api/?key=${process.env.REACT_APP_PIXABAY_API_KEY}&page=${
-          currentPage + 1
-        }&per_page=24&q=${debouncedSearchTerm}`
-      )
-        .then((response) => response.json())
-        .then((data) => {
-          setImages({ imagesArray: [...images.imagesArray, ...data.hits] });
-          setCurrentPage((value) => value + 1);
-        })
-        .catch((error) => console.log(error));
-    }
+    if (isScrolledToBottom) fetchImages();
     setIsScrolledToBottom(false);
-  }, [isScrolledToBottom]);
+  }, [fetchImages, isScrolledToBottom]);
 
   return (
     <div ref={wrapperRef}>
